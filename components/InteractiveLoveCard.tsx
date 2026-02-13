@@ -195,6 +195,8 @@ export default function InteractiveLoveCard() {
 }
 
 function PanelStatic({ moment, scale }: { moment: Moment; scale: number }) {
+    const bg = moment.imageUrl ? `url(${moment.imageUrl})` : "none";
+
   return (
     <div
       className="rounded-[18px] bg-white/70 shadow-[0_16px_40px_rgba(0,0,0,0.18)] ring-1 ring-black/5 backdrop-blur"
@@ -203,7 +205,7 @@ function PanelStatic({ moment, scale }: { moment: Moment; scale: number }) {
       <div className="overflow-hidden rounded-[18px] bg-white">
         <div
           className="h-[280px] w-full bg-cover bg-center"
-          style={{ backgroundImage: `url(${moment.imageUrl})` }}
+          style={{ backgroundImage: bg }}
         />
         <div className="h-7 bg-white/90" />
       </div>
@@ -234,6 +236,8 @@ function PanelInteractive({
   );
   const isLetter = moment.kind === "letter";
   const [mounted, setMounted] = React.useState(false);
+  const bg = moment.imageUrl ? `url(${moment.imageUrl})` : "none";
+
 
   React.useEffect(() => {
     setMounted(true);
@@ -252,7 +256,7 @@ function PanelInteractive({
         <div className="overflow-hidden rounded-[18px] bg-white">
           <div
             className="h-[280px] w-full bg-cover bg-center"
-            style={{ backgroundImage: `url(${moment.imageUrl})` }}
+            style={{ backgroundImage: bg }}
           />
           <div className="h-7 bg-white/90" />
         </div>
