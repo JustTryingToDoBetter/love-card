@@ -47,7 +47,7 @@ export default function InteractiveLoveCard() {
     y.set(next);
   };
 
-  const onDragEnd = (_: any, info: { velocity: { y: number } }) => {
+  const onDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const current = y.get();
     const v = info.velocity.y;
 
