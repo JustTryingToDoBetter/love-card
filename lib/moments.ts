@@ -5,6 +5,7 @@ export type Moment = {
   dateLabel: string;
   imageUrl: string;
   story: string;
+  kind?: "photo" | "letter"
 };
 
 export const MOMENTS: Moment[] = [

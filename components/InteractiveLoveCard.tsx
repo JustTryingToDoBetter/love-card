@@ -232,20 +232,33 @@ function PanelInteractive({
     [0, maxDrag],
     ["0 16px 45px rgba(0,0,0,0.18)", "0 26px 70px rgba(0,0,0,0.22)"]
   );
+  const isLetter = moment.kind === "letter";
 
   return (
     <motion.div
       className="rounded-[18px] bg-white/80 ring-1 ring-black/5 backdrop-blur"
       style={{ rotate, boxShadow: shadow }}
     >
-      <div className="overflow-hidden rounded-[18px] bg-white">
-        <div
-          className="h-[280px] w-full bg-cover bg-center"
-          style={{ backgroundImage: `url(${moment.imageUrl})` }}
-        />
-        <div className="h-7 bg-white/90" />
-      </div>
-
+      {!isLetter ? (
+        <div className="overflow-hidden rounded-[18px] bg-white">
+          <div
+            className="h-[280px] w-full bg-cover bg-center"
+            style={{ backgroundImage: `url(${moment.imageUrl})` }}
+          />
+          <div className="h-7 bg-white/90" />
+        </div>
+      ) : (
+        <div className="rounded-[18px] bg-[linear-gradient(to_bottom,rgba(255,255,255,0.9),rgba(255,255,255,0.75))]">
+          <div className="px-6 pt-7 pb-6">
+            <div className="text-sm text-black/45">Dear love,</div>
+            <div className="mt-4 whitespace-pre-line text-sm leading-relaxed text-black/65">
+              {moment.story}
+            </div>
+            <div className="mt-6 text-sm text-black/55">— Yours</div>
+          </div>
+        </div>
+      )}
+        
       {/* “Paper caption” area (scrapbook vibe) */}
       <div className="px-5 py-5">
         <div className="flex items-baseline justify-between gap-3">
