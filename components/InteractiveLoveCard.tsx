@@ -233,11 +233,20 @@ function PanelInteractive({
     ["0 16px 45px rgba(0,0,0,0.18)", "0 26px 70px rgba(0,0,0,0.22)"]
   );
   const isLetter = moment.kind === "letter";
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <motion.div
       className="rounded-[18px] bg-white/80 ring-1 ring-black/5 backdrop-blur"
-      style={{ rotate, boxShadow: shadow }}
+      style={
+        mounted
+          ? { rotate, boxShadow: shadow }
+          : { rotate: 0, boxShadow: "0 16px 45px rgba(0,0,0,0.18)" }
+      }
     >
       {!isLetter ? (
         <div className="overflow-hidden rounded-[18px] bg-white">
