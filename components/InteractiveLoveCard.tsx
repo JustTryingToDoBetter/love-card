@@ -47,20 +47,23 @@ export default function InteractiveLoveCard() {
     y.set(next);
   };
 
-  const onDragEnd = () => {
+  const onDragEnd = (_: any, info: { velocity: { y: number } }) => {
     const current = y.get();
+    const v = info.velocity.y;
 
-    if (current > DRAG_THRESHOLD && active < maxIndex) {
-      // Snap down then advance
-      animate(y, MAX_DRAG, { type: "spring", stiffness: 260, damping: 26 }).then(() => {
-        goNext();
-      });
-      return;
+    const shouldAdvance =
+        active < maxIndex && (current > DRAG_THRESHOLD || v > 900);
+
+    if (shouldAdvance) {
+        animate(y, MAX_DRAG, { type: "spring", stiffness: 260, damping: 26 }).then(
+        () => goNext()
+        );
+        return;
     }
 
-    // Otherwise snap back
     animate(y, 0, { type: "spring", stiffness: 320, damping: 26 });
-  };
+    };
+
 
   // Keyboard (nice for desktop)
   React.useEffect(() => {
@@ -197,11 +200,12 @@ function PanelStatic({ moment, scale }: { moment: Moment; scale: number }) {
       className="rounded-[18px] bg-white/70 shadow-[0_16px_40px_rgba(0,0,0,0.18)] ring-1 ring-black/5 backdrop-blur"
       style={{ transform: `scale(${scale})` }}
     >
-      <div className="overflow-hidden rounded-[18px]">
+      <div className="overflow-hidden rounded-[18px] bg-white">
         <div
           className="h-[280px] w-full bg-cover bg-center"
           style={{ backgroundImage: `url(${moment.imageUrl})` }}
         />
+        <div className="h-7 bg-white/90" />
       </div>
       <div className="px-4 py-4">
         <div className="text-xs uppercase tracking-widest text-black/45">{moment.dateLabel}</div>
@@ -234,11 +238,12 @@ function PanelInteractive({
       className="rounded-[18px] bg-white/80 ring-1 ring-black/5 backdrop-blur"
       style={{ rotate, boxShadow: shadow }}
     >
-      <div className="overflow-hidden rounded-[18px]">
+      <div className="overflow-hidden rounded-[18px] bg-white">
         <div
           className="h-[280px] w-full bg-cover bg-center"
           style={{ backgroundImage: `url(${moment.imageUrl})` }}
         />
+        <div className="h-7 bg-white/90" />
       </div>
 
       {/* “Paper caption” area (scrapbook vibe) */}
