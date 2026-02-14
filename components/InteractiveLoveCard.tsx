@@ -14,7 +14,7 @@ import {
 import { MOMENTS, type Moment } from "@/lib/moments";
 import ProgressDots from "@/components/ProgressDots";
 import { makeAudio } from "@/lib/sound";
-
+import TypewriterText from "@/components/TypewriterText";
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
 export default function InteractiveLoveCard() {
@@ -184,13 +184,16 @@ export default function InteractiveLoveCard() {
               </motion.div>
             </AnimatePresence>
 
-            {/* Bottom hint */}
-            <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center">
-              <div className="rounded-full bg-white/70 px-4 py-2 text-xs text-black/55 ring-1 ring-black/5 backdrop-blur">
-                {active < maxIndex ? "Pull down for the next moment ↓" : "End ✨"}
-              </div>
-            </div>
+            
+          
           </div>
+
+          <div className="mt-3 flex items-center justify-center">
+          <div className="rounded-full bg-white/70 px-4 py-2 text-xs text-black/55 ring-1 ring-black/5">
+            {active < maxIndex ? "Pull down for the next moment ↓" : "End ✨"}
+          </div>
+        </div>
+
 
           {/* Controls (minimal) */}
           <div className="mt-4 flex items-center justify-between px-1">
@@ -273,7 +276,7 @@ function PanelInteractive({
 
   return (
     <motion.div
-      className="h-full rounded-[18px] bg-white/90 ring-1 ring-black/5 backdrop-blur"
+      className="h-full rounded-[18px] bg-white ring-1 ring-black/5"
       style={{ rotate, boxShadow: shadow }}
     >
       {isTextPage ? (
@@ -298,7 +301,21 @@ function PanelInteractive({
           <div className="px-5 pb-5 pt-2">
             <div className="text-xs uppercase tracking-widest text-black/45">{moment.dateLabel}</div>
             <div className="mt-1 text-lg font-semibold text-black/85">{moment.title}</div>
-            <div className="mt-3 text-sm leading-relaxed text-black/65">{moment.story}</div>
+            <div className="mt-3 text-sm leading-relaxed text-black/65">
+            <TypewriterText
+              text={moment.story}
+              className="whitespace-pre-line"
+              cursorClassName="ml-0.5 text-black/50"
+              typingSpeedMs={18}
+              blinkIntervalMs={450}
+              soundEnabled={true}
+              typingSoundSrc="/audio/rustle.mp3"
+              typingSoundVolume={0.08}
+              typingSoundThrottleMs={45}
+              start={true}
+              />
+            </div>
+
           </div>
         </div>
       )}
