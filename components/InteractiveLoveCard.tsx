@@ -19,6 +19,32 @@ import TypewriterText from "@/components/TypewriterText";
 /** util: clamp a number into [min, max] */
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
+/* =====================================================================================
+   Shared visual primitive: subtle paper grain (inline SVG data URI; no external assets)
+===================================================================================== */
+const PAPER_NOISE_DATA_URI = `url("data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'>
+    <filter id='n'>
+      <feTurbulence type='fractalNoise' baseFrequency='0.92' numOctaves='2' seed='7'/>
+    </filter>
+    <rect width='180' height='180' filter='url(#n)' opacity='0.85'/>
+  </svg>`
+)}")`;
+
+function PaperNoiseOverlay() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-[0.07] blur-[0.45px]"
+      style={{
+        backgroundImage: PAPER_NOISE_DATA_URI,
+        backgroundSize: "180px 180px",
+        mixBlendMode: "soft-light",
+      }}
+    />
+  );
+}
+
 export default function InteractiveLoveCard() {
   // =========================
   // State
@@ -32,6 +58,16 @@ export default function InteractiveLoveCard() {
   const sfxSnap = React.useRef<HTMLAudioElement | null>(null);
   const sfxRustle = React.useRef<HTMLAudioElement | null>(null);
   const bgm = React.useRef<HTMLAudioElement | null>(null);
+
+  // =========================
+  // Snap scheduling guard
+  // =========================
+  const snapTimeoutRef = React.useRef<number | null>(null);
+
+  // =========================
+  // Photo load tracking for active panel text fade-in
+  // =========================
+  const [loadedByMomentId, setLoadedByMomentId] = React.useState<Record<string, boolean>>({});
 
   React.useEffect(() => {
     // SFX
@@ -66,6 +102,13 @@ export default function InteractiveLoveCard() {
   );
 
   // =========================
+  // Under-panel parallax depth (revealed panel subtly reacts to drag)
+  // =========================
+  const nextPanelScale = useTransform(y, [0, MAX_DRAG], [0.985, 1]);
+  const nextPanelOpacity = useTransform(y, [0, MAX_DRAG], [0.8, 0.92]);
+  const nextPanelY = useTransform(y, [0, MAX_DRAG], [-3, 0]);
+
+  // =========================
   // Helpers
   // =========================
   const playAudio = React.useCallback((audioRef: React.RefObject<HTMLAudioElement | null>) => {
@@ -97,13 +140,30 @@ export default function InteractiveLoveCard() {
     setActive((i) => {
       const nextIndex = Math.min(i + 1, maxIndex);
       if (nextIndex !== i) {
-        // paper feel + snap confirm
+        // paper feel + delayed snap confirm
         playAudio(sfxRustle);
-        window.setTimeout(() => playAudio(sfxSnap), 120);
+
+        if (snapTimeoutRef.current !== null) {
+          window.clearTimeout(snapTimeoutRef.current);
+        }
+
+        snapTimeoutRef.current = window.setTimeout(() => {
+          playAudio(sfxSnap);
+          snapTimeoutRef.current = null;
+        }, 180);
       }
       return nextIndex;
     });
   }, [maxIndex, playAudio]);
+
+  // Cleanup pending snap timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (snapTimeoutRef.current !== null) {
+        window.clearTimeout(snapTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Reset drag position when the moment changes + preload next image
   React.useEffect(() => {
@@ -152,6 +212,49 @@ export default function InteractiveLoveCard() {
   // =========================
   const activeMoment = MOMENTS[active];
   const nextMoment = MOMENTS[Math.min(active + 1, maxIndex)];
+  const activeKind = activeMoment.kind ?? "photo";
+  const activeIsTextPage = activeKind === "cover" || activeKind === "letter";
+
+  // =========================
+  // Image-load detection for background-image cards (supports cached images)
+  // =========================
+  React.useEffect(() => {
+    if (activeIsTextPage || !activeMoment.imageUrl) {
+      setLoadedByMomentId((prev) => ({ ...prev, [activeMoment.id]: true }));
+      return;
+    }
+
+    let cancelled = false;
+
+    // Reset to hidden while this active image is being confirmed
+    setLoadedByMomentId((prev) => ({ ...prev, [activeMoment.id]: false }));
+
+    const image = new Image();
+    image.src = activeMoment.imageUrl;
+
+    const markLoaded = () => {
+      if (cancelled) return;
+      setLoadedByMomentId((prev) => ({ ...prev, [activeMoment.id]: true }));
+    };
+
+    if (image.complete) {
+      markLoaded();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    image.onload = markLoaded;
+    image.onerror = markLoaded;
+
+    return () => {
+      cancelled = true;
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [activeMoment.id, activeMoment.imageUrl, activeIsTextPage]);
+
+  const isActiveStoryReady = activeIsTextPage || !!loadedByMomentId[activeMoment.id];
 
   return (
     <div className="w-full">
@@ -187,9 +290,16 @@ export default function InteractiveLoveCard() {
           <div className="relative overflow-hidden rounded-[22px] px-4 pt-4 pb-4 ring-1 ring-black/5">
             {/* Next (peek underneath) */}
             {active < maxIndex && (
-              <div className="pointer-events-none absolute inset-4 opacity-85">
-                <PanelStatic moment={nextMoment} scale={0.985} />
-              </div>
+              <motion.div
+                className="pointer-events-none absolute inset-4"
+                style={{
+                  scale: nextPanelScale,
+                  opacity: nextPanelOpacity,
+                  y: nextPanelY,
+                }}
+              >
+                <PanelStatic moment={nextMoment} scale={1} />
+              </motion.div>
             )}
 
             {/* Active (draggable) */}
@@ -209,7 +319,12 @@ export default function InteractiveLoveCard() {
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ type: "spring", stiffness: 240, damping: 24 }}
               >
-                <PanelInteractive moment={activeMoment} rotate={rotate} shadow={shadow} />
+                <PanelInteractive
+                  moment={activeMoment}
+                  rotate={rotate}
+                  shadow={shadow}
+                  isStoryReady={isActiveStoryReady}
+                />
               </motion.div>
             </AnimatePresence>
           </div>
@@ -264,9 +379,12 @@ function PanelStatic({ moment, scale }: { moment: Moment; scale: number }) {
 
   return (
     <div
-      className="h-full rounded-[18px] bg-white/70 shadow-[0_16px_40px_rgba(0,0,0,0.18)] ring-1 ring-black/5 backdrop-blur"
+      className="relative h-full overflow-hidden rounded-[18px] bg-white/70 shadow-[0_16px_40px_rgba(0,0,0,0.18)] ring-1 ring-black/5 backdrop-blur"
       style={{ transform: `scale(${scale})` }}
     >
+      {/* Added: reusable subtle paper texture */}
+      <PaperNoiseOverlay />
+
       {isTextPage ? (
         <div className="flex h-full flex-col justify-center p-6">
           <div className="text-sm text-black/45">Dear love,</div>
@@ -306,19 +424,24 @@ function PanelInteractive({
   moment,
   rotate,
   shadow,
+  isStoryReady,
 }: {
   moment: Moment;
   rotate: MotionValue<number>;
   shadow: MotionValue<string>;
+  isStoryReady: boolean;
 }) {
   const kind = moment.kind ?? "photo";
   const isTextPage = kind === "cover" || kind === "letter";
 
   return (
     <motion.div
-      className="rounded-[18px] bg-white ring-1 ring-black/5"
+      className="relative overflow-hidden rounded-[18px] bg-white ring-1 ring-black/5"
       style={{ rotate, boxShadow: shadow }}
     >
+      {/* Added: reusable subtle paper texture */}
+      <PaperNoiseOverlay />
+
       {isTextPage ? (
         <div className="flex flex-col justify-center p-6">
           <div className="text-sm text-black/45">Dear love,</div>
@@ -347,7 +470,13 @@ function PanelInteractive({
             <div className="text-xs uppercase tracking-widest text-black/45">{moment.dateLabel}</div>
             <div className="mt-1 text-lg font-semibold text-black/85">{moment.title}</div>
 
-            <div className="mt-3 text-sm leading-relaxed text-black/65">
+            {/* Added: story fades in only after photo is confirmed loaded */}
+            <motion.div
+              className="mt-3 text-sm leading-relaxed text-black/65"
+              initial={false}
+              animate={{ opacity: isStoryReady ? 1 : 0, y: isStoryReady ? 0 : 6 }}
+              transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+            >
               <TypewriterText
                 text={moment.story}
                 className="whitespace-pre-line"
@@ -360,7 +489,7 @@ function PanelInteractive({
                 typingSoundThrottleMs={45}
                 start
               />
-            </div>
+            </motion.div>
           </div>
         </div>
       )}
