@@ -61,6 +61,12 @@ export default function TypewriterText({
   // Incrementally reveal characters until the full text is rendered.
   React.useEffect(() => {
     if (!start) {
+      const audio = typingAudioRef.current;
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+
       setVisibleChars(0);
       setIsComplete(false);
       return;
@@ -81,6 +87,17 @@ export default function TypewriterText({
     return () => window.clearTimeout(timer);
   }, [start, visibleChars, text.length, typingSpeedMs, isComplete, onComplete]);
 
+  // Ensure typing audio stops immediately once typing is complete.
+  React.useEffect(() => {
+    if (!isComplete) return;
+
+    const audio = typingAudioRef.current;
+    if (!audio) return;
+
+    audio.pause();
+    audio.currentTime = 0;
+  }, [isComplete]);
+
   // Start blinking cursor only after typing has finished.
   React.useEffect(() => {
     if (!isComplete) return;
@@ -93,6 +110,7 @@ export default function TypewriterText({
   }, [isComplete, blinkIntervalMs]);
 
   React.useEffect(() => {
+    if (isComplete) return;
     if (!soundEnabled || !typingSoundSrc || !start || visibleChars === 0) return;
 
     const latestChar = text[visibleChars - 1];
