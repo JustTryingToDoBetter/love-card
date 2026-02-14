@@ -15,35 +15,49 @@ import { MOMENTS, type Moment } from "@/lib/moments";
 import ProgressDots from "@/components/ProgressDots";
 import { makeAudio } from "@/lib/sound";
 import TypewriterText from "@/components/TypewriterText";
+
+/** util: clamp a number into [min, max] */
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
 export default function InteractiveLoveCard() {
+  // =========================
+  // State
+  // =========================
   const [active, setActive] = React.useState(0);
   const [musicOn, setMusicOn] = React.useState(false);
 
+  // =========================
+  // Audio refs (SFX + BGM)
+  // =========================
   const sfxSnap = React.useRef<HTMLAudioElement | null>(null);
   const sfxRustle = React.useRef<HTMLAudioElement | null>(null);
   const bgm = React.useRef<HTMLAudioElement | null>(null);
 
   React.useEffect(() => {
+    // SFX
     sfxSnap.current = makeAudio("/audio/snap.mp3", 0.6);
     sfxRustle.current = makeAudio("/audio/rustle.mp3", 0.35);
 
+    // Background music (loop)
     bgm.current = makeAudio("/audio/bg.mp3", 0.22);
     bgm.current.loop = true;
 
+    // Cleanup: stop bgm on unmount
     return () => {
       bgm.current?.pause();
     };
   }, []);
 
+  // =========================
+  // Drag + motion values
+  // =========================
   const y = useMotionValue(0);
   const maxIndex = MOMENTS.length - 1;
 
   const DRAG_THRESHOLD = 140;
   const MAX_DRAG = 220;
 
-  // Compute motion styles ONCE here (correct scope)
+  // Motion styling derived from drag amount
   const rotate = useTransform(y, [0, MAX_DRAG], [0, 0.8]);
   const shadow = useTransform(
     y,
@@ -51,6 +65,9 @@ export default function InteractiveLoveCard() {
     ["0 16px 45px rgba(0,0,0,0.18)", "0 26px 70px rgba(0,0,0,0.22)"]
   );
 
+  // =========================
+  // Helpers
+  // =========================
   const playAudio = React.useCallback((audioRef: React.RefObject<HTMLAudioElement | null>) => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -62,6 +79,7 @@ export default function InteractiveLoveCard() {
     const audio = bgm.current;
     if (!audio) return;
 
+    // If currently off -> try to start (user gesture safe)
     if (!musicOn) {
       void audio
         .play()
@@ -70,6 +88,7 @@ export default function InteractiveLoveCard() {
       return;
     }
 
+    // If currently on -> pause
     audio.pause();
     setMusicOn(false);
   }, [musicOn]);
@@ -78,6 +97,7 @@ export default function InteractiveLoveCard() {
     setActive((i) => {
       const nextIndex = Math.min(i + 1, maxIndex);
       if (nextIndex !== i) {
+        // paper feel + snap confirm
         playAudio(sfxRustle);
         window.setTimeout(() => playAudio(sfxSnap), 120);
       }
@@ -85,7 +105,7 @@ export default function InteractiveLoveCard() {
     });
   }, [maxIndex, playAudio]);
 
-  // Reset drag position when moment changes + preload next image
+  // Reset drag position when the moment changes + preload next image
   React.useEffect(() => {
     y.set(0);
 
@@ -96,6 +116,9 @@ export default function InteractiveLoveCard() {
     }
   }, [active, y]);
 
+  // =========================
+  // Drag handlers
+  // =========================
   const onDrag = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const next = clamp(info.offset.y, 0, MAX_DRAG);
     y.set(next);
@@ -115,7 +138,7 @@ export default function InteractiveLoveCard() {
     animate(y, 0, { type: "spring", stiffness: 320, damping: 26 });
   };
 
-  // keyboard forward only
+  // Keyboard: forward only
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowDown") goNext();
@@ -124,13 +147,18 @@ export default function InteractiveLoveCard() {
     return () => window.removeEventListener("keydown", handler);
   }, [goNext]);
 
+  // =========================
+  // Derived data
+  // =========================
   const activeMoment = MOMENTS[active];
   const nextMoment = MOMENTS[Math.min(active + 1, maxIndex)];
 
   return (
     <div className="w-full">
       <div className="relative mx-auto rounded-[28px] bg-white/80 shadow-[0_18px_60px_rgba(0,0,0,0.18)] ring-1 ring-black/5 backdrop-blur">
-        {/* Header */}
+        {/* =========================
+            Header
+           ========================= */}
         <div className="px-5 pt-5 pb-3">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -150,15 +178,16 @@ export default function InteractiveLoveCard() {
           </div>
         </div>
 
-        {/* Viewport */}
+        {/* =========================
+            Viewport
+            NOTE: No fixed height anymore.
+            The viewport grows with content (no inner scroll).
+           ========================= */}
         <div className="px-4 pb-5">
-          <div
-            className="relative overflow-hidden rounded-[22px] px-4 pt-4 pb-16 ring-1 ring-black/5"
-            style={{ height: "min(70svh, 640px)" }}
-          >
+          <div className="relative overflow-hidden rounded-[22px] px-4 pt-4 pb-4 ring-1 ring-black/5">
             {/* Next (peek underneath) */}
             {active < maxIndex && (
-              <div className="pointer-events-none absolute inset-x-4 top-4 bottom-4 opacity-85">
+              <div className="pointer-events-none absolute inset-4 opacity-85">
                 <PanelStatic moment={nextMoment} scale={0.985} />
               </div>
             )}
@@ -167,7 +196,7 @@ export default function InteractiveLoveCard() {
             <AnimatePresence mode="popLayout">
               <motion.div
                 key={activeMoment.id}
-                className="absolute inset-x-4 top-4 bottom-4 cursor-grab active:cursor-grabbing"
+                className="relative z-10 cursor-grab active:cursor-grabbing"
                 style={{ y }}
                 drag="y"
                 dragDirectionLock
@@ -183,19 +212,18 @@ export default function InteractiveLoveCard() {
                 <PanelInteractive moment={activeMoment} rotate={rotate} shadow={shadow} />
               </motion.div>
             </AnimatePresence>
-
-            
-          
           </div>
 
+          {/* Hint pill (outside viewport so it never clips content) */}
           <div className="mt-3 flex items-center justify-center">
-          <div className="rounded-full bg-white/70 px-4 py-2 text-xs text-black/55 ring-1 ring-black/5">
-            {active < maxIndex ? "Pull down for the next moment ↓" : "End ✨"}
+            <div className="rounded-full bg-white/70 px-4 py-2 text-xs text-black/55 ring-1 ring-black/5">
+              {active < maxIndex ? "Pull down for the next moment ↓" : "End ✨"}
+            </div>
           </div>
-        </div>
 
-
-          {/* Controls (minimal) */}
+          {/* =========================
+              Controls (minimal)
+             ========================= */}
           <div className="mt-4 flex items-center justify-between px-1">
             <button
               type="button"
@@ -217,12 +245,19 @@ export default function InteractiveLoveCard() {
         </div>
       </div>
 
-      {/* Soft glow */}
+      {/* =========================
+          Soft background glow
+         ========================= */}
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_30%_20%,rgba(255,210,230,0.35),transparent_55%),radial-gradient(circle_at_80%_10%,rgba(255,240,200,0.35),transparent_50%)] blur-2xl" />
     </div>
   );
 }
 
+/* =====================================================================================
+   PanelStatic
+   - Used for the “next” panel underneath (peek preview)
+   - Pointer-events disabled by parent so it never captures input
+===================================================================================== */
 function PanelStatic({ moment, scale }: { moment: Moment; scale: number }) {
   const kind = moment.kind ?? "photo";
   const isTextPage = kind === "cover" || kind === "letter";
@@ -262,6 +297,11 @@ function PanelStatic({ moment, scale }: { moment: Moment; scale: number }) {
   );
 }
 
+/* =====================================================================================
+   PanelInteractive
+   - Foreground draggable panel
+   - NO inner scroll: story area expands naturally
+===================================================================================== */
 function PanelInteractive({
   moment,
   rotate,
@@ -276,19 +316,23 @@ function PanelInteractive({
 
   return (
     <motion.div
-      className="h-full rounded-[18px] bg-white ring-1 ring-black/5"
+      className="rounded-[18px] bg-white ring-1 ring-black/5"
       style={{ rotate, boxShadow: shadow }}
     >
       {isTextPage ? (
-        <div className="flex h-full flex-col justify-center p-6">
+        <div className="flex flex-col justify-center p-6">
           <div className="text-sm text-black/45">Dear love,</div>
+
+          {/* Text pages: simple expanding content */}
           <div className="mt-6 whitespace-pre-line text-base leading-relaxed text-black/75">
             {moment.story}
           </div>
+
           <div className="mt-8 text-sm text-black/55">— Yours</div>
         </div>
       ) : (
-        <div className="flex h-full flex-col">
+        <div className="flex flex-col">
+          {/* Photo area */}
           <div className="p-4">
             <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[16px] bg-black/5">
               <div
@@ -298,24 +342,25 @@ function PanelInteractive({
             </div>
           </div>
 
+          {/* Caption/story area (NO scroll; it expands) */}
           <div className="px-5 pb-5 pt-2">
             <div className="text-xs uppercase tracking-widest text-black/45">{moment.dateLabel}</div>
             <div className="mt-1 text-lg font-semibold text-black/85">{moment.title}</div>
+
             <div className="mt-3 text-sm leading-relaxed text-black/65">
-            <TypewriterText
-              text={moment.story}
-              className="whitespace-pre-line"
-              cursorClassName="ml-0.5 text-black/50"
-              typingSpeedMs={18}
-              blinkIntervalMs={450}
-              soundEnabled={true}
-              typingSoundSrc="/audio/rustle.mp3"
-              typingSoundVolume={0.08}
-              typingSoundThrottleMs={45}
-              start={true}
+              <TypewriterText
+                text={moment.story}
+                className="whitespace-pre-line"
+                cursorClassName="ml-0.5 text-black/50"
+                typingSpeedMs={18}
+                blinkIntervalMs={450}
+                soundEnabled
+                typingSoundSrc="/audio/rustle.mp3"
+                typingSoundVolume={0.08}
+                typingSoundThrottleMs={45}
+                start
               />
             </div>
-
           </div>
         </div>
       )}
